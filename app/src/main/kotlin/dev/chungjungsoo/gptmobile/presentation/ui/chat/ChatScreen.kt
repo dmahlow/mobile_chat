@@ -153,7 +153,7 @@ fun ChatScreen(
 
     var userScrolledAway by remember { mutableStateOf(false) }
 
-    // Detect user scrolling away from bottom
+    // Track user manually scrolling away
     LaunchedEffect(Unit) {
         snapshotFlow { listState.isScrollInProgress to isAtBottom }
             .collectLatest { (scrolling, atBottom) ->
@@ -165,22 +165,11 @@ fun ChatScreen(
             }
     }
 
-    // Follow streaming content when at bottom
-    val messageCount = groupedMessages.userMessages.size
-    val lastAssistantContent = groupedMessages.assistantMessages.lastOrNull()?.firstOrNull()?.content?.length ?: 0
-    LaunchedEffect(messageCount, lastAssistantContent, isIdle) {
-        if (!isIdle && !userScrolledAway && anchorIndex > 0) {
+    // When user sends a new message, scroll to bottom once
+    LaunchedEffect(groupedMessages.userMessages.size) {
+        userScrolledAway = false
+        if (anchorIndex > 0) {
             listState.scrollToItem(anchorIndex)
-        }
-    }
-
-    // When user sends a new message, reset and scroll to bottom
-    LaunchedEffect(isIdle) {
-        if (!isIdle) {
-            userScrolledAway = false
-            if (anchorIndex > 0) {
-                listState.scrollToItem(anchorIndex)
-            }
         }
     }
 
