@@ -174,7 +174,6 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
@@ -206,7 +205,9 @@ fun ChatScreen(
                     .fillMaxWidth()
             ) {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
                     state = listState,
                     reverseLayout = true
                 ) {
