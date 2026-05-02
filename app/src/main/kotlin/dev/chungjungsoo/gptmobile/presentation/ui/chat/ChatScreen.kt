@@ -69,7 +69,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -101,7 +100,6 @@ import dev.chungjungsoo.gptmobile.data.database.entity.effectiveThoughts
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -142,42 +140,20 @@ fun ChatScreen(
     val lastMessageIndex = groupedMessages.userMessages.lastIndex
 
     val scope = rememberCoroutineScope()
-    val anchorIndex = lastMessageIndex + 1
 
+    // With reverseLayout, index 0 is the bottom (newest). isAtBottom = firstVisibleItemIndex == 0
     val isAtBottom by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
-            lastVisible.index >= anchorIndex
-        }
+        derivedStateOf { listState.firstVisibleItemIndex == 0 }
     }
 
-    var userScrolledAway by remember { mutableStateOf(false) }
-
-    // Track user manually scrolling away
-    LaunchedEffect(Unit) {
-        snapshotFlow { listState.isScrollInProgress to isAtBottom }
-            .collectLatest { (scrolling, atBottom) ->
-                if (scrolling && !atBottom) {
-                    userScrolledAway = true
-                } else if (atBottom) {
-                    userScrolledAway = false
-                }
-            }
-    }
-
-    // When user sends a new message, scroll to bottom once
+    // Scroll to bottom (index 0 in reverseLayout)
     LaunchedEffect(groupedMessages.userMessages.size) {
-        userScrolledAway = false
-        if (anchorIndex > 0) {
-            listState.scrollToItem(anchorIndex)
-        }
+        listState.scrollToItem(0)
     }
 
-    // Scroll to bottom when messages finish loading from DB
     LaunchedEffect(isLoaded) {
-        if (isLoaded && anchorIndex > 0) {
-            listState.scrollToItem(anchorIndex)
+        if (isLoaded) {
+            listState.scrollToItem(0)
         }
     }
 
@@ -190,9 +166,9 @@ fun ChatScreen(
 
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(imeVisible) {
-        if (imeVisible && anchorIndex > 0) {
+        if (imeVisible) {
             delay(100)
-            listState.animateScrollToItem(anchorIndex)
+            listState.animateScrollToItem(0)
         }
     }
 
@@ -231,25 +207,30 @@ fun ChatScreen(
             ) {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    state = listState
+                    state = listState,
+                    reverseLayout = true
                 ) {
-                    val historicalMessageCount = lastMessageIndex.coerceAtLeast(0)
+                    val totalMessages = groupedMessages.userMessages.size
 
                     items(
-                        count = historicalMessageCount,
-                        key = { index -> chatMessagePairKey(groupedMessages.userMessages[index], index) }
-                    ) { index ->
+                        count = totalMessages,
+                        key = { reverseIdx ->
+                            val actualIndex = totalMessages - 1 - reverseIdx
+                            chatMessagePairKey(groupedMessages.userMessages[actualIndex], actualIndex)
+                        }
+                    ) { reverseIdx ->
+                        val actualIndex = totalMessages - 1 - reverseIdx
                         ChatMessagePair(
-                            messageIndex = index,
-                            message = groupedMessages.userMessages[index],
-                            assistantMessages = groupedMessages.assistantMessages.getOrNull(index) ?: emptyList(),
-                            platformIndexState = indexStates.getOrElse(index) { 0 },
+                            messageIndex = actualIndex,
+                            message = groupedMessages.userMessages[actualIndex],
+                            assistantMessages = groupedMessages.assistantMessages.getOrNull(actualIndex) ?: emptyList(),
+                            platformIndexState = indexStates.getOrElse(actualIndex) { 0 },
                             loadingStates = loadingStates,
                             enabledPlatformsInChat = chatViewModel.enabledPlatformsInChat,
                             enabledPlatformLookup = enabledPlatformLookup,
                             canUseChat = canUseChat,
                             isIdle = isIdle,
-                            isActiveMessage = false,
+                            isActiveMessage = actualIndex == lastMessageIndex,
                             maximumUserChatBubbleWidth = maximumUserChatBubbleWidth,
                             maximumOpponentChatBubbleWidth = maximumOpponentChatBubbleWidth,
                             onEditQuestion = chatViewModel::openUserMessageEditDialog,
@@ -266,41 +247,6 @@ fun ChatScreen(
                             onShowNextRevision = chatViewModel::showNextAssistantRevision
                         )
                     }
-
-                    if (lastMessageIndex >= 0) {
-                        item(key = chatMessagePairKey(groupedMessages.userMessages[lastMessageIndex], lastMessageIndex)) {
-                            ChatMessagePair(
-                                messageIndex = lastMessageIndex,
-                                message = groupedMessages.userMessages[lastMessageIndex],
-                                assistantMessages = groupedMessages.assistantMessages.getOrNull(lastMessageIndex) ?: emptyList(),
-                                platformIndexState = indexStates.getOrElse(lastMessageIndex) { 0 },
-                                loadingStates = loadingStates,
-                                enabledPlatformsInChat = chatViewModel.enabledPlatformsInChat,
-                                enabledPlatformLookup = enabledPlatformLookup,
-                                canUseChat = canUseChat,
-                                isIdle = isIdle,
-                                isActiveMessage = true,
-                                maximumUserChatBubbleWidth = maximumUserChatBubbleWidth,
-                                maximumOpponentChatBubbleWidth = maximumOpponentChatBubbleWidth,
-                                onEditQuestion = chatViewModel::openUserMessageEditDialog,
-                                onEditAssistant = chatViewModel::openAssistantMessageEditDialog,
-                                onCopyText = { copiedText ->
-                                    scope.launch {
-                                        clipboardManager.setClipEntry(ClipEntry(ClipData.newPlainText(copiedText, copiedText)))
-                                    }
-                                },
-                                onPlatformClick = chatViewModel::updateChatPlatformIndex,
-                                onSelectText = chatViewModel::openSelectTextSheet,
-                                onRetry = chatViewModel::retryChat,
-                                onShowPreviousRevision = chatViewModel::showPreviousAssistantRevision,
-                                onShowNextRevision = chatViewModel::showNextAssistantRevision
-                            )
-                        }
-                    }
-
-                    item(key = "scroll-anchor") {
-                        Spacer(modifier = Modifier.size(1.dp))
-                    }
                 }
 
                 if (!isAtBottom) {
@@ -311,9 +257,8 @@ fun ChatScreen(
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         ScrollToBottomButton {
-                            userScrolledAway = false
                             scope.launch {
-                                listState.animateScrollToItem(anchorIndex)
+                                listState.animateScrollToItem(0)
                             }
                         }
                     }
