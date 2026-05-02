@@ -68,6 +68,8 @@ class SettingDataSourceImpl @Inject constructor(
     )
     private val dynamicThemeKey = intPreferencesKey("dynamic_mode")
     private val themeModeKey = intPreferencesKey("theme_mode")
+    private val braveSearchTokenKey = stringPreferencesKey("brave_search_token")
+    private val webSearchEnabledKey = booleanPreferencesKey("web_search_enabled")
 
     override suspend fun updateDynamicTheme(theme: DynamicTheme) {
         dataStore.edit { pref ->
@@ -166,4 +168,24 @@ class SettingDataSourceImpl @Inject constructor(
     override suspend fun getSystemPrompt(apiType: ApiType): String? = dataStore.data.map { pref ->
         pref[apiSystemPromptMap[apiType]!!]
     }.first()
+
+    override suspend fun getBraveSearchToken(): String? = dataStore.data.map { pref ->
+        pref[braveSearchTokenKey]
+    }.first()
+
+    override suspend fun updateBraveSearchToken(token: String) {
+        dataStore.edit { pref ->
+            pref[braveSearchTokenKey] = token
+        }
+    }
+
+    override suspend fun getWebSearchEnabled(): Boolean? = dataStore.data.map { pref ->
+        pref[webSearchEnabledKey]
+    }.first()
+
+    override suspend fun updateWebSearchEnabled(enabled: Boolean) {
+        dataStore.edit { pref ->
+            pref[webSearchEnabledKey] = enabled
+        }
+    }
 }

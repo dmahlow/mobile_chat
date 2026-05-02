@@ -32,6 +32,11 @@ suspend fun Flow<ApiState>.handleStates(
                     buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
                 }
 
+                is ApiState.Searching -> {
+                    buffer.appendThought("[Searching: ${chunk.query}]\n")
+                    buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
+                }
+
                 is ApiState.Success -> {
                     buffer.appendContent(chunk.textChunk)
                     buffer.publishIfDue(messageFlow, turnIndex, platformIdx)

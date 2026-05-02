@@ -25,6 +25,7 @@ class SettingViewModelV2 @Inject constructor(
 
     init {
         fetchPlatforms()
+        loadWebSearchSettings()
     }
 
     fun fetchPlatforms() {
@@ -59,6 +60,45 @@ class SettingViewModelV2 @Inject constructor(
         val platform = _platformState.value.find { it.id == platformId }
         platform?.let {
             updatePlatform(it.copy(enabled = !it.enabled))
+        }
+    }
+
+    private val _webSearchEnabled = MutableStateFlow(false)
+    val webSearchEnabled: StateFlow<Boolean> = _webSearchEnabled.asStateFlow()
+
+    private val _braveSearchToken = MutableStateFlow("")
+    val braveSearchToken: StateFlow<String> = _braveSearchToken.asStateFlow()
+
+    private val _isWebSearchDialogOpen = MutableStateFlow(false)
+    val isWebSearchDialogOpen: StateFlow<Boolean> = _isWebSearchDialogOpen.asStateFlow()
+
+    private fun loadWebSearchSettings() {
+        viewModelScope.launch {
+            try {
+                _webSearchEnabled.value = settingRepository.isWebSearchEnabled()
+                _braveSearchToken.value = settingRepository.getBraveSearchToken() ?: ""
+            } catch (_: Exception) {
+                _webSearchEnabled.value = false
+                _braveSearchToken.value = ""
+            }
+        }
+    }
+
+    fun toggleWebSearch(enabled: Boolean) {
+        viewModelScope.launch {
+            settingRepository.setWebSearchEnabled(enabled)
+            _webSearchEnabled.value = enabled
+        }
+    }
+
+    fun openWebSearchDialog() = _isWebSearchDialogOpen.update { true }
+    fun closeWebSearchDialog() = _isWebSearchDialogOpen.update { false }
+
+    fun saveBraveSearchToken(token: String) {
+        viewModelScope.launch {
+            settingRepository.setBraveSearchToken(token)
+            _braveSearchToken.value = token
+            closeWebSearchDialog()
         }
     }
 

@@ -135,4 +135,16 @@ class SettingRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getPlatformV2ById(id: Int): PlatformV2? = platformV2Dao.getPlatform(id)
+
+    override suspend fun getBraveSearchToken(): String? = settingDataSource.getBraveSearchToken()
+
+    override suspend fun setBraveSearchToken(token: String) {
+        settingDataSource.updateBraveSearchToken(token)
+    }
+
+    override suspend fun isWebSearchEnabled(): Boolean = settingDataSource.getWebSearchEnabled() ?: false
+
+    override suspend fun setWebSearchEnabled(enabled: Boolean) {
+        settingDataSource.updateWebSearchEnabled(enabled)
+    }
 }

@@ -17,4 +17,10 @@ interface SettingRepository {
     suspend fun updatePlatformV2(platform: PlatformV2)
     suspend fun deletePlatformV2(platform: PlatformV2)
     suspend fun getPlatformV2ById(id: Int): PlatformV2?
+
+    // Web search settings
+    suspend fun getBraveSearchToken(): String?
+    suspend fun setBraveSearchToken(token: String)
+    suspend fun isWebSearchEnabled(): Boolean
+    suspend fun setWebSearchEnabled(enabled: Boolean)
 }

@@ -45,5 +45,9 @@ data class GroqChatCompletionRequest(
 
     @SerialName("stop")
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val stop: List<String>? = null
+    val stop: List<String>? = null,
+
+    @SerialName("tools")
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val tools: List<dev.chungjungsoo.gptmobile.data.dto.openai.request.OpenAITool>? = null
 )

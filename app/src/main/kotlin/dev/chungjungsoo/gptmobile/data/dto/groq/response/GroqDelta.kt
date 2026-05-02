@@ -12,5 +12,8 @@ data class GroqDelta(
     val content: String? = null,
 
     @SerialName("reasoning")
-    val reasoning: String? = null
+    val reasoning: String? = null,
+
+    @SerialName("tool_calls")
+    val toolCalls: List<dev.chungjungsoo.gptmobile.data.dto.openai.response.DeltaToolCall>? = null
 )

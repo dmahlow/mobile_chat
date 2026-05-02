@@ -51,7 +51,44 @@ data class MessageRequest(
 
     @SerialName("thinking")
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val thinking: ThinkingConfig? = null
+    val thinking: ThinkingConfig? = null,
+
+    @SerialName("tools")
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val tools: List<AnthropicTool>? = null
+)
+
+@Serializable
+data class AnthropicTool(
+    @SerialName("name")
+    val name: String,
+
+    @SerialName("description")
+    val description: String,
+
+    @SerialName("input_schema")
+    val inputSchema: AnthropicToolSchema
+)
+
+@Serializable
+data class AnthropicToolSchema(
+    @SerialName("type")
+    val type: String = "object",
+
+    @SerialName("properties")
+    val properties: Map<String, AnthropicToolProperty>,
+
+    @SerialName("required")
+    val required: List<String> = emptyList()
+)
+
+@Serializable
+data class AnthropicToolProperty(
+    @SerialName("type")
+    val type: String,
+
+    @SerialName("description")
+    val description: String = ""
 )
 
 @OptIn(ExperimentalSerializationApi::class)

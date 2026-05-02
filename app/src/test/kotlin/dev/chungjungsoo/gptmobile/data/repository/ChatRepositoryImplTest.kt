@@ -18,8 +18,10 @@ import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponsesRequest
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ChatCompletionChunk
 import dev.chungjungsoo.gptmobile.data.dto.openai.response.ResponsesStreamEvent
 import dev.chungjungsoo.gptmobile.data.model.ChatAttachment
+import dev.chungjungsoo.gptmobile.data.dto.brave.BraveSearchResponse
 import dev.chungjungsoo.gptmobile.data.model.ClientType
 import dev.chungjungsoo.gptmobile.data.network.AnthropicAPI
+import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPI
 import dev.chungjungsoo.gptmobile.data.network.GoogleAPI
 import dev.chungjungsoo.gptmobile.data.network.GroqAPI
 import dev.chungjungsoo.gptmobile.data.network.OpenAIAPI
@@ -254,6 +256,10 @@ class ChatRepositoryImplTest {
         openAIAPI = openAIAPI,
         groqAPI = groqAPI,
         anthropicAPI = FakeAnthropicAPI(),
+        toolCallOrchestrator = ToolCallOrchestrator(
+            braveSearchAPI = FakeBraveSearchAPI(),
+            settingRepository = proxy()
+        ),
         googleAPI = FakeGoogleAPI(),
         attachmentUploadCoordinator = AttachmentUploadCoordinator(
             openAIAPI,
@@ -377,5 +383,10 @@ class ChatRepositoryImplTest {
         ): UploadedProviderFile = UploadedProviderFile(id = "google-file", mimeType = mimeType)
 
         override suspend fun isFileAvailable(fileName: String): Boolean = false
+    }
+
+    private class FakeBraveSearchAPI : BraveSearchAPI {
+        override fun setToken(token: String?) = Unit
+        override suspend fun search(query: String, count: Int): BraveSearchResponse = BraveSearchResponse()
     }
 }
