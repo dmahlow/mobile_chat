@@ -111,15 +111,25 @@ fun OpponentChatBubble(
         disabledContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
     )
 
+    // Parse tool markers from thoughts prefix
+    val toolsUsed = parseToolMarkers(thoughts)
+    val cleanThoughts = stripToolMarkers(thoughts)
+
     // Show thinking block while loading if we have thoughts but no text yet
-    val isThinking = isLoading && thoughts.isNotBlank() && text.isBlank()
+    val isThinking = isLoading && cleanThoughts.isNotBlank() && text.isBlank()
 
     Column(modifier = modifier) {
+        // Tool use indicator
+        ToolUseIndicator(
+            toolNames = toolsUsed,
+            isActive = isLoading
+        )
+
         // Thinking block (collapsed by default)
-        if (thoughts.isNotBlank()) {
+        if (cleanThoughts.isNotBlank()) {
             ThinkingBlock(
                 modifier = Modifier.padding(top = 16.dp, start = 8.dp, end = 8.dp),
-                thoughts = thoughts,
+                thoughts = cleanThoughts,
                 contentIdentity = contentIdentity,
                 isLoading = isThinking
             )
@@ -435,3 +445,13 @@ private fun isImageFile(extension: String?): Boolean {
     val imageExtensions = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
     return extension?.lowercase() in imageExtensions
 }
+
+private val toolMarkerRegex = Regex("""\[tools:([^\]]+)]""")
+
+internal fun parseToolMarkers(thoughts: String): List<String> {
+    val match = toolMarkerRegex.find(thoughts) ?: return emptyList()
+    return match.groupValues[1].split(",").filter { it.isNotBlank() }
+}
+
+internal fun stripToolMarkers(thoughts: String): String =
+    thoughts.replace(Regex("""\[tools:[^\]]+]\n?"""), "")

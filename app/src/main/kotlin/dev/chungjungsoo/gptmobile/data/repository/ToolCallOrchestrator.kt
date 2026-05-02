@@ -2,11 +2,16 @@ package dev.chungjungsoo.gptmobile.data.repository
 
 import dev.chungjungsoo.gptmobile.data.dto.ApiState
 import dev.chungjungsoo.gptmobile.data.dto.brave.BraveSearchResponse
+import dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.SearchSource
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.ToolCallRequest
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.ToolCallResult
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool
 import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPI
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.encodeToString
@@ -119,28 +124,42 @@ class ToolCallOrchestrator(
         val results = mutableListOf<ToolCallResult>()
 
         for (toolCall in toolCalls) {
-            if (toolCall.name != WebSearchTool.NAME) continue
-
-            val query = extractSearchQuery(toolCall.arguments) ?: continue
-
-            try {
-                val token = settingRepository.getBraveSearchToken() ?: continue
-                braveSearchAPI.setToken(token)
-                val response = braveSearchAPI.search(query)
-                val resultText = formatSearchResults(response)
-                results.add(ToolCallResult(toolCallId = toolCall.id, name = toolCall.name, result = resultText))
-            } catch (_: Exception) {
-                results.add(
-                    ToolCallResult(
-                        toolCallId = toolCall.id,
-                        name = toolCall.name,
-                        result = "Search failed. Please answer based on your existing knowledge."
-                    )
-                )
+            when (toolCall.name) {
+                WebSearchTool.NAME -> {
+                    val query = extractSearchQuery(toolCall.arguments) ?: continue
+                    try {
+                        val token = settingRepository.getBraveSearchToken() ?: continue
+                        braveSearchAPI.setToken(token)
+                        val response = braveSearchAPI.search(query)
+                        val resultText = formatSearchResults(response)
+                        results.add(ToolCallResult(toolCallId = toolCall.id, name = toolCall.name, result = resultText))
+                    } catch (_: Exception) {
+                        results.add(
+                            ToolCallResult(
+                                toolCallId = toolCall.id,
+                                name = toolCall.name,
+                                result = "Search failed. Please answer based on your existing knowledge."
+                            )
+                        )
+                    }
+                }
+                DateTimeTool.NAME -> {
+                    results.add(ToolCallResult(toolCallId = toolCall.id, name = toolCall.name, result = getCurrentDateTime()))
+                }
             }
         }
 
         return results
+    }
+
+    private fun getCurrentDateTime(): String {
+        val now = ZonedDateTime.now()
+        val dayOfWeek = now.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        val date = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        val time = now.format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+        val timezone = now.zone.id
+        val utcOffset = now.offset.id
+        return """{"date": "$date", "time": "$time", "day_of_week": "$dayOfWeek", "timezone": "$timezone", "utc_offset": "$utcOffset"}"""
     }
 
     private fun extractSearchQuery(arguments: String): String? = try {

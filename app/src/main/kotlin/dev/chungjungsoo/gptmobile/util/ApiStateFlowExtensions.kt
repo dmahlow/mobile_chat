@@ -33,8 +33,12 @@ suspend fun Flow<ApiState>.handleStates(
                 }
 
                 is ApiState.Searching -> {
-                    buffer.appendThought("[Searching: ${chunk.query}]\n")
+                    buffer.addToolUse("web_search")
                     buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
+                }
+
+                is ApiState.ToolCallChunk -> {
+                    chunk.name?.let { buffer.addToolUse(it) }
                 }
 
                 is ApiState.Success -> {
@@ -80,9 +84,11 @@ private class StreamingMessageBuffer(
 ) {
     private val thoughts = StringBuilder()
     private val content = StringBuilder()
+    private val toolsUsed = mutableSetOf<String>()
     private var lastPublishedAtNanos = 0L
     private var publishedThoughtLength = 0
     private var publishedContentLength = 0
+    private var publishedToolCount = 0
 
     fun appendThought(chunk: String) {
         if (chunk.isNotEmpty()) {
@@ -94,6 +100,10 @@ private class StreamingMessageBuffer(
         if (chunk.isNotEmpty()) {
             content.append(chunk)
         }
+    }
+
+    fun addToolUse(name: String) {
+        toolsUsed.add(name)
     }
 
     fun publishIfDue(
@@ -126,18 +136,27 @@ private class StreamingMessageBuffer(
         platformIdx: Int,
         publishedAtNanos: Long
     ) {
+        val toolPrefix = if (toolsUsed.isNotEmpty()) {
+            toolsUsed.joinToString(",", prefix = "[tools:", postfix = "]\n")
+        } else {
+            ""
+        }
         messageFlow.setBufferedText(
             turnIndex = turnIndex,
             platformIdx = platformIdx,
             content = content.toString(),
-            thoughts = thoughts.toString()
+            thoughts = toolPrefix + thoughts.toString()
         )
         publishedContentLength = content.length
         publishedThoughtLength = thoughts.length
+        publishedToolCount = toolsUsed.size
         lastPublishedAtNanos = publishedAtNanos
     }
 
-    private fun hasPendingChanges(): Boolean = content.length != publishedContentLength || thoughts.length != publishedThoughtLength
+    private fun hasPendingChanges(): Boolean =
+        content.length != publishedContentLength ||
+            thoughts.length != publishedThoughtLength ||
+            toolsUsed.size != publishedToolCount
 }
 
 private fun MutableStateFlow<ChatViewModel.GroupedMessages>.setBufferedText(
