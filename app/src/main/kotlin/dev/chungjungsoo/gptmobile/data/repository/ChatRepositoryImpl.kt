@@ -394,6 +394,16 @@ class ChatRepositoryImpl @Inject constructor(
                     required = listOf(dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY)
                 )
             )
+        ),
+        OpenAITool(
+            function = OpenAIToolFunction(
+                name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.NAME,
+                description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.DESCRIPTION,
+                parameters = OpenAIToolParameters(
+                    properties = emptyMap(),
+                    required = emptyList()
+                )
+            )
         )
     )
 

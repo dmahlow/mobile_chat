@@ -135,6 +135,22 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch { fetchMessages() }
         fetchEnabledPlatformsInApp()
         observeStateChanges()
+        consumeSharedContent()
+    }
+
+    private fun consumeSharedContent() {
+        val (sharedText, sharedImages) = dev.chungjungsoo.gptmobile.data.model.SharedContentHolder.consume()
+        if (sharedText == null && sharedImages.isEmpty()) return
+        if (chatRoomId != 0) return
+
+        viewModelScope.launch {
+            sharedText?.let { text ->
+                question.setTextAndPlaceCursorAtEnd(text)
+            }
+            sharedImages.forEach { path ->
+                addSelectedFile(path)
+            }
+        }
     }
 
     fun addMessage(userMessage: MessageV2) {

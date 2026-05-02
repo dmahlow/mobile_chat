@@ -102,6 +102,15 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(lifecycleState) {
+        if (lifecycleState == Lifecycle.State.RESUMED && dev.chungjungsoo.gptmobile.data.model.SharedContentHolder.hasPending()) {
+            val enabledPlatforms = platformState.filter { it.enabled }.map { it.uid }
+            if (enabledPlatforms.isNotEmpty()) {
+                navigateToNewChat(enabledPlatforms)
+            }
+        }
+    }
+
     BackHandler(enabled = chatListState.isSelectionMode || chatListState.isSearchMode) {
         when {
             chatListState.isSelectionMode -> homeViewModel.disableSelectionMode()
