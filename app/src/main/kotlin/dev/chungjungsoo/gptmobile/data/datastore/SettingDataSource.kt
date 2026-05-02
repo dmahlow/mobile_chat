@@ -23,4 +23,8 @@ interface SettingDataSource {
     suspend fun getTemperature(apiType: ApiType): Float?
     suspend fun getTopP(apiType: ApiType): Float?
     suspend fun getSystemPrompt(apiType: ApiType): String?
+    suspend fun getBraveSearchToken(): String?
+    suspend fun updateBraveSearchToken(token: String)
+    suspend fun getWebSearchEnabled(): Boolean?
+    suspend fun updateWebSearchEnabled(enabled: Boolean)
 }

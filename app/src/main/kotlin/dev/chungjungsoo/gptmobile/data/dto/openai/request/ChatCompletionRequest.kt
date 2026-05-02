@@ -47,5 +47,51 @@ data class ChatCompletionRequest(
 
     @SerialName("stop")
     @EncodeDefault(EncodeDefault.Mode.NEVER)
-    val stop: List<String>? = null
+    val stop: List<String>? = null,
+
+    @SerialName("tools")
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val tools: List<OpenAITool>? = null
+)
+
+@Serializable
+data class OpenAITool(
+    @SerialName("type")
+    val type: String = "function",
+
+    @SerialName("function")
+    val function: OpenAIToolFunction
+)
+
+@Serializable
+data class OpenAIToolFunction(
+    @SerialName("name")
+    val name: String,
+
+    @SerialName("description")
+    val description: String,
+
+    @SerialName("parameters")
+    val parameters: OpenAIToolParameters
+)
+
+@Serializable
+data class OpenAIToolParameters(
+    @SerialName("type")
+    val type: String = "object",
+
+    @SerialName("properties")
+    val properties: Map<String, OpenAIToolProperty>,
+
+    @SerialName("required")
+    val required: List<String> = emptyList()
+)
+
+@Serializable
+data class OpenAIToolProperty(
+    @SerialName("type")
+    val type: String,
+
+    @SerialName("description")
+    val description: String = ""
 )

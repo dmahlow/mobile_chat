@@ -13,5 +13,17 @@ data class ContentBlock(
     val text: String? = null,
 
     @SerialName("thinking")
-    val thinking: String? = null
+    val thinking: String? = null,
+
+    @SerialName("id")
+    val id: String? = null,
+
+    @SerialName("name")
+    val name: String? = null,
+
+    @SerialName("input")
+    val input: kotlinx.serialization.json.JsonObject? = null,
+
+    @SerialName("partial_json")
+    val partialJson: String? = null
 )

@@ -6,6 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.chungjungsoo.gptmobile.data.network.AnthropicAPI
 import dev.chungjungsoo.gptmobile.data.network.AnthropicAPIImpl
+import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPI
+import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPIImpl
 import dev.chungjungsoo.gptmobile.data.network.GoogleAPI
 import dev.chungjungsoo.gptmobile.data.network.GoogleAPIImpl
 import dev.chungjungsoo.gptmobile.data.network.GroqAPI
@@ -39,4 +41,8 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideGoogleAPI(networkClient: NetworkClient): GoogleAPI = GoogleAPIImpl(networkClient)
+
+    @Provides
+    @Singleton
+    fun provideBraveSearchAPI(networkClient: NetworkClient): BraveSearchAPI = BraveSearchAPIImpl(networkClient)
 }

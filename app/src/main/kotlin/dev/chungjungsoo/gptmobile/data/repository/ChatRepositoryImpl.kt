@@ -39,6 +39,12 @@ import dev.chungjungsoo.gptmobile.data.dto.openai.common.Role as OpenAIRole
 import dev.chungjungsoo.gptmobile.data.dto.openai.common.TextContent as OpenAITextContent
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ChatCompletionRequest
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ChatMessage
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.ChatMessageToolCall
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.ChatMessageToolCallFunction
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.OpenAITool
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.OpenAIToolFunction
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.OpenAIToolParameters
+import dev.chungjungsoo.gptmobile.data.dto.openai.request.OpenAIToolProperty
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ReasoningConfig
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponseContentPart
 import dev.chungjungsoo.gptmobile.data.dto.openai.request.ResponseInputContent
@@ -78,6 +84,7 @@ class ChatRepositoryImpl @Inject constructor(
     private val openAIAPI: OpenAIAPI,
     private val groqAPI: GroqAPI,
     private val anthropicAPI: AnthropicAPI,
+    private val toolCallOrchestrator: ToolCallOrchestrator,
     private val googleAPI: GoogleAPI,
     private val attachmentUploadCoordinator: AttachmentUploadCoordinator,
     private val contextBuilder: ContextBuilder
@@ -261,7 +268,14 @@ class ChatRepositoryImpl @Inject constructor(
         openAIAPI.setToken(platform.token)
         openAIAPI.setAPIUrl(platform.apiUrl)
 
-        streamPreparedApiState(
+        val webSearchEnabled = try {
+            settingRepository.isWebSearchEnabled() &&
+                settingRepository.getBraveSearchToken()?.isNotBlank() == true
+        } catch (_: Exception) {
+            false
+        }
+
+        val baseFlow = streamPreparedApiState(
             prepare = {
                 val contextTurns = buildContextTurns(userMessages, assistantMessages, platform)
                 validateInlineBudgetIfNeeded(contextTurns, platform)
@@ -272,30 +286,116 @@ class ChatRepositoryImpl @Inject constructor(
                     messages = messages,
                     stream = platform.stream,
                     temperature = platform.temperature,
-                    topP = platform.topP
+                    topP = platform.topP,
+                    tools = if (webSearchEnabled) webSearchToolDefinition() else null
                 )
             },
             stream = { request ->
-                flow {
-                    openAIAPI.streamChatCompletion(request, platform.timeout).collect { chunk ->
-                        when {
-                            chunk.error != null -> emit(ApiState.Error(chunk.error.message))
-
-                            chunk.choices?.firstOrNull()?.delta?.content != null -> {
-                                emit(ApiState.Success(chunk.choices.first().delta.content!!))
-                            }
-                        }
-                    }
-                }
+                streamOpenAIChatCompletionWithToolCalls(request, platform.timeout)
             }
         ).catch { e ->
             emit(ApiState.Error(e.message ?: "Unknown error"))
-        }.onCompletion {
-            emit(ApiState.Done)
+        }
+
+        if (webSearchEnabled) {
+            toolCallOrchestrator.orchestrateWithToolDetection(
+                initialFlow = baseFlow,
+                onToolCallDetected = {},
+                continueWithToolResults = { toolResults ->
+                    val contextTurns = buildContextTurns(userMessages, assistantMessages, platform)
+                    validateInlineBudgetIfNeeded(contextTurns, platform)
+                    val messages = buildOpenAIChatMessages(contextTurns, platform.systemPrompt).toMutableList()
+                    appendToolCallMessages(messages, toolResults)
+
+                    val followUpRequest = ChatCompletionRequest(
+                        model = platform.model,
+                        messages = messages,
+                        stream = platform.stream,
+                        temperature = platform.temperature,
+                        topP = platform.topP
+                    )
+                    streamOpenAIChatCompletionWithToolCalls(followUpRequest, platform.timeout)
+                }
+            )
+        } else {
+            baseFlow.onCompletion { emit(ApiState.Done) }
         }
     } catch (e: Exception) {
         flowOf(ApiState.Error(e.message ?: "Failed to complete chat"))
     }
+
+    private fun streamOpenAIChatCompletionWithToolCalls(
+        request: ChatCompletionRequest,
+        timeoutSeconds: Int
+    ): Flow<ApiState> = flow {
+        openAIAPI.streamChatCompletion(request, timeoutSeconds).collect { chunk ->
+            when {
+                chunk.error != null -> emit(ApiState.Error(chunk.error.message))
+
+                else -> {
+                    val choice = chunk.choices?.firstOrNull() ?: return@collect
+                    choice.delta.content?.let { emit(ApiState.Success(it)) }
+                    choice.delta.toolCalls?.forEach { toolCall ->
+                        emit(
+                            ApiState.ToolCallChunk(
+                                index = toolCall.index,
+                                id = toolCall.id,
+                                name = toolCall.function?.name,
+                                argumentsChunk = toolCall.function?.arguments
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun appendToolCallMessages(
+        messages: MutableList<ChatMessage>,
+        toolResults: List<dev.chungjungsoo.gptmobile.data.dto.toolcalling.ToolCallResult>
+    ) {
+        messages.add(
+            ChatMessage(
+                role = OpenAIRole.ASSISTANT,
+                toolCalls = toolResults.map { result ->
+                    ChatMessageToolCall(
+                        id = result.toolCallId,
+                        function = ChatMessageToolCallFunction(
+                            name = result.name,
+                            arguments = "{\"query\": \"search\"}"
+                        )
+                    )
+                }
+            )
+        )
+        toolResults.forEach { result ->
+            messages.add(
+                ChatMessage(
+                    role = OpenAIRole.TOOL,
+                    content = listOf(OpenAITextContent(text = result.result)),
+                    toolCallId = result.toolCallId
+                )
+            )
+        }
+    }
+
+    private fun webSearchToolDefinition(): List<OpenAITool> = listOf(
+        OpenAITool(
+            function = OpenAIToolFunction(
+                name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.NAME,
+                description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.DESCRIPTION,
+                parameters = OpenAIToolParameters(
+                    properties = mapOf(
+                        dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY to OpenAIToolProperty(
+                            type = "string",
+                            description = "The search query"
+                        )
+                    ),
+                    required = listOf(dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY)
+                )
+            )
+        )
+    )
 
     private suspend fun buildContextTurns(
         userMessages: List<MessageV2>,

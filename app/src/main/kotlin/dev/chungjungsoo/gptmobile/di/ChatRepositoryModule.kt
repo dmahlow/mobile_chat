@@ -13,17 +13,26 @@ import dev.chungjungsoo.gptmobile.data.database.dao.ChatRoomV2Dao
 import dev.chungjungsoo.gptmobile.data.database.dao.MessageDao
 import dev.chungjungsoo.gptmobile.data.database.dao.MessageV2Dao
 import dev.chungjungsoo.gptmobile.data.network.AnthropicAPI
+import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPI
 import dev.chungjungsoo.gptmobile.data.network.GoogleAPI
 import dev.chungjungsoo.gptmobile.data.network.GroqAPI
 import dev.chungjungsoo.gptmobile.data.network.OpenAIAPI
 import dev.chungjungsoo.gptmobile.data.repository.ChatRepository
 import dev.chungjungsoo.gptmobile.data.repository.ChatRepositoryImpl
 import dev.chungjungsoo.gptmobile.data.repository.SettingRepository
+import dev.chungjungsoo.gptmobile.data.repository.ToolCallOrchestrator
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object ChatRepositoryModule {
+
+    @Provides
+    @Singleton
+    fun provideToolCallOrchestrator(
+        braveSearchAPI: BraveSearchAPI,
+        settingRepository: SettingRepository
+    ): ToolCallOrchestrator = ToolCallOrchestrator(braveSearchAPI, settingRepository)
 
     @Provides
     @Singleton
@@ -40,7 +49,8 @@ object ChatRepositoryModule {
         anthropicAPI: AnthropicAPI,
         googleAPI: GoogleAPI,
         attachmentUploadCoordinator: dev.chungjungsoo.gptmobile.data.repository.AttachmentUploadCoordinator,
-        contextBuilder: ContextBuilder
+        contextBuilder: ContextBuilder,
+        toolCallOrchestrator: ToolCallOrchestrator
     ): ChatRepository = ChatRepositoryImpl(
         context,
         chatRoomDao,
@@ -52,6 +62,7 @@ object ChatRepositoryModule {
         openAIAPI,
         groqAPI,
         anthropicAPI,
+        toolCallOrchestrator,
         googleAPI,
         attachmentUploadCoordinator,
         contextBuilder

@@ -1,11 +1,13 @@
 package dev.chungjungsoo.gptmobile.presentation.ui.setting
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -17,6 +19,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -78,6 +81,10 @@ fun SettingScreen(
         }
     }
 
+    val webSearchEnabled by settingViewModel.webSearchEnabled.collectAsStateWithLifecycle()
+    val braveToken by settingViewModel.braveSearchToken.collectAsStateWithLifecycle()
+    val isWebSearchDialogOpen by settingViewModel.isWebSearchDialogOpen.collectAsStateWithLifecycle()
+
     Scaffold(
         modifier = modifier
             .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -94,6 +101,13 @@ fun SettingScreen(
                 .verticalScroll(scrollState)
         ) {
             ThemeSetting { settingViewModel.openThemeDialog() }
+
+            WebSearchSetting(
+                enabled = webSearchEnabled,
+                hasToken = braveToken.isNotBlank(),
+                onToggle = { settingViewModel.toggleWebSearch(it) },
+                onConfigureClick = { settingViewModel.openWebSearchDialog() }
+            )
 
             // Add Platform button
             SettingItem(
@@ -130,6 +144,14 @@ fun SettingScreen(
                 DeletePlatformDialog(settingViewModel)
             }
         }
+    }
+
+    if (isWebSearchDialogOpen) {
+        BraveSearchTokenDialog(
+            initialToken = braveToken,
+            onDismiss = { settingViewModel.closeWebSearchDialog() },
+            onConfirm = { settingViewModel.saveBraveSearchToken(it) }
+        )
     }
 }
 
@@ -174,6 +196,102 @@ fun ThemeSetting(
         onItemClick = onItemClick,
         showTrailingIcon = false,
         showLeadingIcon = false
+    )
+}
+
+@Composable
+fun WebSearchSetting(
+    enabled: Boolean,
+    hasToken: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onConfigureClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Web Search",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = if (hasToken) "Brave Search configured" else "Tap to configure API key",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
+                enabled = hasToken
+            )
+        }
+        if (!hasToken) {
+            TextButton(onClick = onConfigureClick) {
+                Text("Configure Brave Search API Key")
+            }
+        } else {
+            TextButton(onClick = onConfigureClick) {
+                Text("Change API Key")
+            }
+        }
+    }
+}
+
+@Composable
+fun BraveSearchTokenDialog(
+    initialToken: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val textFieldState = rememberTextFieldState(initialToken)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Brave Search API Key") },
+        text = {
+            Column {
+                Text(
+                    text = "Get a free key at brave.com/search/api",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                androidx.compose.foundation.text.BasicTextField(
+                    state = textFieldState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(
+                        color = MaterialTheme.colorScheme.onSurface
+                    ),
+                    decorator = { innerTextField ->
+                        Column {
+                            Text(
+                                text = "API Key",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            innerTextField()
+                        }
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(textFieldState.text.toString()) },
+                enabled = textFieldState.text.isNotBlank()
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
     )
 }
 
