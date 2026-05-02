@@ -143,12 +143,6 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val anchorIndex = lastMessageIndex + 1
 
-    suspend fun scrollToBottom() {
-        if (anchorIndex > 0) {
-            listState.animateScrollToItem(anchorIndex)
-        }
-    }
-
     val isAtBottom by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -159,35 +153,39 @@ fun ChatScreen(
 
     var userScrolledAway by remember { mutableStateOf(false) }
 
-    // Detect user-initiated scrolling away from the bottom
+    // Detect user scrolling away from bottom
     LaunchedEffect(Unit) {
         snapshotFlow { listState.isScrollInProgress to isAtBottom }
             .collectLatest { (scrolling, atBottom) ->
                 if (scrolling && !atBottom) {
                     userScrolledAway = true
+                } else if (atBottom) {
+                    userScrolledAway = false
                 }
             }
     }
 
-    // Auto-scroll during streaming when user hasn't scrolled away
-    LaunchedEffect(groupedMessages, isIdle) {
-        if (!isIdle && !userScrolledAway) {
-            scrollToBottom()
+    // Smooth follow during streaming: instant scroll (no animation fights user gestures)
+    LaunchedEffect(groupedMessages) {
+        if (!isIdle && !userScrolledAway && anchorIndex > 0) {
+            listState.scrollToItem(anchorIndex)
         }
     }
 
-    // Scroll to bottom when streaming starts (new message sent)
+    // When user sends a new message, reset and scroll to bottom
     LaunchedEffect(isIdle) {
         if (!isIdle) {
             userScrolledAway = false
-            scrollToBottom()
+            if (anchorIndex > 0) {
+                listState.scrollToItem(anchorIndex)
+            }
         }
     }
 
     // Scroll to bottom when messages finish loading from DB
     LaunchedEffect(isLoaded) {
-        if (isLoaded) {
-            scrollToBottom()
+        if (isLoaded && anchorIndex > 0) {
+            listState.scrollToItem(anchorIndex)
         }
     }
 
@@ -198,12 +196,11 @@ fun ChatScreen(
         }
     }
 
-    // Auto-scroll to bottom when keyboard opens
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(imeVisible) {
-        if (imeVisible) {
+        if (imeVisible && anchorIndex > 0) {
             delay(100)
-            scrollToBottom()
+            listState.animateScrollToItem(anchorIndex)
         }
     }
 
@@ -323,7 +320,7 @@ fun ChatScreen(
                         ScrollToBottomButton {
                             userScrolledAway = false
                             scope.launch {
-                                scrollToBottom()
+                                listState.animateScrollToItem(anchorIndex)
                             }
                         }
                     }
