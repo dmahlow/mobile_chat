@@ -106,6 +106,10 @@ class ToolCallOrchestrator(
                 return@flow
             }
 
+            toolCalls.forEach { tc ->
+                emit(ApiState.ToolCallChunk(index = 0, id = tc.id, name = tc.name, argumentsChunk = null))
+            }
+
             onToolCallDetected(toolCalls)
 
             val toolResults = executeToolCalls(toolCalls)
