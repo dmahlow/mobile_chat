@@ -453,11 +453,11 @@ private fun chatMarkdownTypography() = markdownTypography(
     h4 = MaterialTheme.typography.titleMedium,
     h5 = MaterialTheme.typography.titleSmall,
     h6 = MaterialTheme.typography.labelLarge,
-    text = MaterialTheme.typography.bodyMedium,
-    paragraph = MaterialTheme.typography.bodyMedium,
-    ordered = MaterialTheme.typography.bodyMedium,
-    bullet = MaterialTheme.typography.bodyMedium,
-    list = MaterialTheme.typography.bodyMedium
+    text = MaterialTheme.typography.bodyLarge,
+    paragraph = MaterialTheme.typography.bodyLarge,
+    ordered = MaterialTheme.typography.bodyLarge,
+    bullet = MaterialTheme.typography.bodyLarge,
+    list = MaterialTheme.typography.bodyLarge
 )
 
 @Composable

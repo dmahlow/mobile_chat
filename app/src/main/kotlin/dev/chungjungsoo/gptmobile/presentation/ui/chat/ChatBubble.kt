@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -29,9 +30,14 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,25 +61,19 @@ fun UserChatBubble(
     files: List<String> = emptyList(),
     onLongPress: () -> Unit
 ) {
-    val cardColor = CardColors(
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        disabledContentColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.38f),
-        disabledContainerColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.38f)
-    )
-
     Column(horizontalAlignment = Alignment.End) {
-        Card(
+        Surface(
             modifier = modifier
                 .pointerInput(Unit) {
                     detectTapGestures(onLongPress = { onLongPress.invoke() })
                 },
-            shape = RoundedCornerShape(32.dp),
-            colors = cardColor
+            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 18.dp, bottomEnd = 4.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
         ) {
             ChatMarkdown(
                 content = text,
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
             )
         }
         MessageFileThumbnailRow(
@@ -104,82 +104,74 @@ fun OpponentChatBubble(
     onShowPreviousRevision: () -> Unit = {},
     onShowNextRevision: () -> Unit = {}
 ) {
-    val cardColor = CardColors(
-        containerColor = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
-        disabledContentColor = MaterialTheme.colorScheme.background.copy(alpha = 0.38f),
-        disabledContainerColor = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.38f)
-    )
-
-    // Parse tool markers from thoughts prefix
     val toolsUsed = parseToolMarkers(thoughts)
     val cleanThoughts = stripToolMarkers(thoughts)
-
-    // Show thinking block while loading if we have thoughts but no text yet
     val isThinking = isLoading && cleanThoughts.isNotBlank() && text.isBlank()
 
     Column(modifier = modifier) {
-        // Tool use indicator
         ToolUseIndicator(
             toolNames = toolsUsed,
             isActive = isLoading
         )
 
-        // Thinking block (collapsed by default)
         if (cleanThoughts.isNotBlank()) {
             ThinkingBlock(
-                modifier = Modifier.padding(top = 16.dp, start = 8.dp, end = 8.dp),
+                modifier = Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp),
                 thoughts = cleanThoughts,
                 contentIdentity = contentIdentity,
                 isLoading = isThinking
             )
         }
 
-        Column {
-            Card(
-                shape = RoundedCornerShape(0.dp),
-                colors = cardColor
+        Column(modifier = Modifier.padding(start = 4.dp, end = 12.dp)) {
+            StreamingChatMarkdown(
+                content = text,
+                isStreaming = isLoading,
+                contentIdentity = contentIdentity,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+
+            MessageFileThumbnailRow(
+                files = attachments,
+                usePrimaryColors = false,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        }
+
+        if (!isLoading) {
+            var actionsExpanded by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier.padding(start = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    val displayText = if (isLoading) text + "●" else text
-
-                    ChatMarkdown(
-                        content = displayText,
-                        contentIdentity = contentIdentity,
-                        modifier = Modifier
-                            .padding(16.dp)
-                    )
-
-                    MessageFileThumbnailRow(
-                        files = attachments,
-                        usePrimaryColors = false,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                IconButton(
+                    onClick = { actionsExpanded = !actionsExpanded },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.MoreHoriz,
+                        contentDescription = stringResource(R.string.options),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(16.dp)
                     )
                 }
-            }
-
-            if (!isLoading) {
-                Row(
-                    modifier = Modifier.padding(start = 16.dp)
-                ) {
+                if (actionsExpanded) {
                     if (!isError) {
                         CopyTextIcon(onCopyClick)
-                        Spacer(modifier = Modifier.width(8.dp))
                         SelectTextIcon(onSelectClick)
                         if (canEdit) {
-                            Spacer(modifier = Modifier.width(8.dp))
                             EditTextIcon(onEditClick)
                         }
                     }
                     if (canRetry) {
-                        Spacer(modifier = Modifier.width(8.dp))
                         RetryIcon(onRetryClick)
                     }
                 }
-
+            }
+            if (actionsExpanded) {
                 revisionIndexLabel?.let { label ->
                     Row(
-                        modifier = Modifier.padding(start = 8.dp),
+                        modifier = Modifier.padding(start = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
@@ -217,21 +209,23 @@ fun GPTMobileIcon(loading: Boolean) {
     Box(
         modifier = Modifier
             .padding(start = 8.dp)
-            .size(40.dp)
-            .clip(RoundedCornerShape(40.dp))
-            .background(color = Color(0xFF00A67D)),
+            .size(28.dp),
         contentAlignment = Alignment.Center
     ) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+            )
+        } else {
+            Icon(
+                imageVector = ImageVector.vectorResource(R.drawable.ic_rounded_chat),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
-        Image(
-            painter = painterResource(R.drawable.ic_gpt_mobile_no_padding),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp)
-        )
     }
 }
 
