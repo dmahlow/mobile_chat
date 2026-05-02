@@ -114,7 +114,7 @@ fun ChatScreen(
     val screenWidthDp = with(LocalDensity.current) { containerSize.width.toDp() }
     val focusManager = LocalFocusManager.current
     val clipboardManager = LocalClipboard.current
-    val systemChatMargin = 32.dp
+    val systemChatMargin = 20.dp
     val maximumUserChatBubbleWidth = (screenWidthDp - systemChatMargin) * 0.8F
     val maximumOpponentChatBubbleWidth = screenWidthDp - systemChatMargin
     val listState = rememberLazyListState()
@@ -463,7 +463,7 @@ private fun ChatMessagePair(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.End
         ) {
             Box {
@@ -486,7 +486,7 @@ private fun ChatMessagePair(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 12.dp)
         ) {
             Row(
                 modifier = Modifier

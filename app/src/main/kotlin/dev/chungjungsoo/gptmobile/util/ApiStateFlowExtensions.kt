@@ -39,6 +39,7 @@ suspend fun Flow<ApiState>.handleStates(
 
                 is ApiState.ToolCallChunk -> {
                     chunk.name?.let { buffer.addToolUse(it) }
+                    buffer.publishIfDue(messageFlow, turnIndex, platformIdx)
                 }
 
                 is ApiState.Success -> {
