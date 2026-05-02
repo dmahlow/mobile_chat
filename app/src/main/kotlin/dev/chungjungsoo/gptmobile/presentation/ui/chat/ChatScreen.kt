@@ -62,11 +62,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -98,6 +100,7 @@ import dev.chungjungsoo.gptmobile.data.database.entity.effectiveThoughts
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -138,19 +141,54 @@ fun ChatScreen(
     val lastMessageIndex = groupedMessages.userMessages.lastIndex
 
     val scope = rememberCoroutineScope()
+    val anchorIndex = lastMessageIndex + 1
 
-    suspend fun animateScrollToLatestMessage() {
-        if (lastMessageIndex >= 0) {
-            listState.animateScrollToItem(lastMessageIndex)
+    suspend fun scrollToBottom() {
+        if (anchorIndex > 0) {
+            listState.animateScrollToItem(anchorIndex)
         }
     }
 
-    LaunchedEffect(isIdle) {
-        animateScrollToLatestMessage()
+    val isAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
+            lastVisible.index >= anchorIndex
+        }
     }
 
+    var userScrolledAway by remember { mutableStateOf(false) }
+
+    // Detect user-initiated scrolling away from the bottom
+    LaunchedEffect(Unit) {
+        snapshotFlow { listState.isScrollInProgress to isAtBottom }
+            .collectLatest { (scrolling, atBottom) ->
+                if (scrolling && !atBottom) {
+                    userScrolledAway = true
+                }
+            }
+    }
+
+    // Auto-scroll during streaming when user hasn't scrolled away
+    LaunchedEffect(groupedMessages, isIdle) {
+        if (!isIdle && !userScrolledAway) {
+            scrollToBottom()
+        }
+    }
+
+    // Scroll to bottom when streaming starts (new message sent)
+    LaunchedEffect(isIdle) {
+        if (!isIdle) {
+            userScrolledAway = false
+            scrollToBottom()
+        }
+    }
+
+    // Scroll to bottom when messages finish loading from DB
     LaunchedEffect(isLoaded) {
-        animateScrollToLatestMessage()
+        if (isLoaded) {
+            scrollToBottom()
+        }
     }
 
     LaunchedEffect(attachmentNotice) {
@@ -164,8 +202,8 @@ fun ChatScreen(
     val imeVisible = WindowInsets.ime.getBottom(LocalDensity.current) > 0
     LaunchedEffect(imeVisible) {
         if (imeVisible) {
-            delay(100) // Small delay to let keyboard animation start
-            animateScrollToLatestMessage()
+            delay(100)
+            scrollToBottom()
         }
     }
 
@@ -269,9 +307,13 @@ fun ChatScreen(
                             )
                         }
                     }
+
+                    item(key = "scroll-anchor") {
+                        Spacer(modifier = Modifier.size(1.dp))
+                    }
                 }
 
-                if (listState.canScrollForward) {
+                if (!isAtBottom) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -279,8 +321,9 @@ fun ChatScreen(
                         contentAlignment = Alignment.BottomCenter
                     ) {
                         ScrollToBottomButton {
+                            userScrolledAway = false
                             scope.launch {
-                                animateScrollToLatestMessage()
+                                scrollToBottom()
                             }
                         }
                     }
