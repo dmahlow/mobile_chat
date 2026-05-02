@@ -1,5 +1,7 @@
 package dev.chungjungsoo.gptmobile.presentation.ui.chat
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -123,7 +125,11 @@ fun OpponentChatBubble(
             )
         }
 
-        Column(modifier = Modifier.padding(start = 4.dp, end = 12.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(start = 4.dp, end = 12.dp)
+                .animateContentSize(animationSpec = spring(dampingRatio = 1f, stiffness = 200f))
+        ) {
             StreamingChatMarkdown(
                 content = text,
                 isStreaming = isLoading,
