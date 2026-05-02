@@ -165,8 +165,10 @@ fun ChatScreen(
             }
     }
 
-    // Smooth follow during streaming: instant scroll (no animation fights user gestures)
-    LaunchedEffect(groupedMessages) {
+    // Follow streaming content when at bottom
+    val messageCount = groupedMessages.userMessages.size
+    val lastAssistantContent = groupedMessages.assistantMessages.lastOrNull()?.firstOrNull()?.content?.length ?: 0
+    LaunchedEffect(messageCount, lastAssistantContent, isIdle) {
         if (!isIdle && !userScrolledAway && anchorIndex > 0) {
             listState.scrollToItem(anchorIndex)
         }

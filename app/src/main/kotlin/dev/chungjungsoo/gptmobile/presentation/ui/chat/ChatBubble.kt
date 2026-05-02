@@ -124,10 +124,9 @@ fun OpponentChatBubble(
         }
 
         Column(modifier = Modifier.padding(start = 4.dp, end = 12.dp)) {
-            val displayText = if (isLoading) text + "●" else text
-
-            ChatMarkdown(
-                content = displayText,
+            StreamingChatMarkdown(
+                content = text,
+                isStreaming = isLoading,
                 contentIdentity = contentIdentity,
                 modifier = Modifier.padding(vertical = 12.dp)
             )

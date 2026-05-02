@@ -2,28 +2,21 @@ package dev.chungjungsoo.gptmobile.presentation.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
 import dev.chungjungsoo.gptmobile.R
 
-val fontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
-)
-
 val SourceSerif = FontFamily(
-    Font(googleFont = GoogleFont("Source Serif 4"), fontProvider = fontProvider, weight = FontWeight.Normal),
-    Font(googleFont = GoogleFont("Source Serif 4"), fontProvider = fontProvider, weight = FontWeight.SemiBold)
+    Font(R.font.source_serif_4_regular, FontWeight.Normal),
+    Font(R.font.source_serif_4_semibold, FontWeight.SemiBold)
 )
 
 val DmSans = FontFamily(
-    Font(googleFont = GoogleFont("DM Sans"), fontProvider = fontProvider, weight = FontWeight.Normal),
-    Font(googleFont = GoogleFont("DM Sans"), fontProvider = fontProvider, weight = FontWeight.Medium),
-    Font(googleFont = GoogleFont("DM Sans"), fontProvider = fontProvider, weight = FontWeight.SemiBold)
+    Font(R.font.dm_sans_regular, FontWeight.Normal),
+    Font(R.font.dm_sans_medium, FontWeight.Medium),
+    Font(R.font.dm_sans_semibold, FontWeight.SemiBold)
 )
 
 val AppTypography = Typography(
