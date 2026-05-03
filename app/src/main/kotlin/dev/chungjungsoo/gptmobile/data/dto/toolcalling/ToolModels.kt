@@ -32,3 +32,10 @@ object DateTimeTool {
     const val NAME = "get_current_datetime"
     const val DESCRIPTION = "Get the current date, time, day of week, and timezone on the user's device. Use whenever the user asks what time or date it is, or when you need temporal context for planning, scheduling, countdowns, or time-sensitive answers."
 }
+
+object SetTitleTool {
+    const val NAME = "set_conversation_title"
+    const val DESCRIPTION = "Set the conversation title and icon. Call this once at the start of a conversation to give it a descriptive short title (under 40 chars) and choose an appropriate icon from the available set."
+    const val PARAM_TITLE = "title"
+    const val PARAM_ICON = "icon"
+}

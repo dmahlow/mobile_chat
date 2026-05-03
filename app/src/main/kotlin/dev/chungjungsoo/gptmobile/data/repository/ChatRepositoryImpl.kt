@@ -18,6 +18,8 @@ import dev.chungjungsoo.gptmobile.data.database.entity.MessageV2
 import dev.chungjungsoo.gptmobile.data.database.entity.PlatformV2
 import dev.chungjungsoo.gptmobile.data.database.entity.effectiveContent
 import dev.chungjungsoo.gptmobile.data.dto.ApiState
+import dev.chungjungsoo.gptmobile.data.dto.toolcalling.SetTitleTool
+import dev.chungjungsoo.gptmobile.data.model.ConversationIcons
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.common.ImageContent as AnthropicImageContent
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.common.ImageSource
 import dev.chungjungsoo.gptmobile.data.dto.anthropic.common.MediaType
@@ -89,6 +91,9 @@ class ChatRepositoryImpl @Inject constructor(
     private val attachmentUploadCoordinator: AttachmentUploadCoordinator,
     private val contextBuilder: ContextBuilder
 ) : ChatRepository {
+
+    private data class PendingTitle(val title: String, val icon: String)
+    private var pendingTitle: PendingTitle? = null
 
     private fun isImageFile(extension: String): Boolean = extension in setOf("jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "svg")
 
@@ -275,6 +280,25 @@ class ChatRepositoryImpl @Inject constructor(
             false
         }
 
+        val isFirstTurn = userMessages.size == 1
+        val toolsEnabled = webSearchEnabled || isFirstTurn
+
+        if (isFirstTurn) {
+            toolCallOrchestrator.onTitleSet = { title, icon ->
+                val sanitizedTitle = title.replace('\n', ' ').take(40)
+                val chatId = userMessages.firstOrNull()?.chatId ?: 0
+                if (chatId > 0) {
+                    val chatRoom = chatRoomV2Dao.getChatRooms().firstOrNull { it.id == chatId }
+                    if (chatRoom != null) {
+                        chatRoomV2Dao.editChatRoom(chatRoom.copy(title = sanitizedTitle, icon = icon))
+                    }
+                }
+                pendingTitle = PendingTitle(sanitizedTitle, icon)
+            }
+        } else {
+            toolCallOrchestrator.onTitleSet = null
+        }
+
         val baseFlow = streamPreparedApiState(
             prepare = {
                 val contextTurns = buildContextTurns(userMessages, assistantMessages, platform)
@@ -287,7 +311,7 @@ class ChatRepositoryImpl @Inject constructor(
                     stream = platform.stream,
                     temperature = platform.temperature,
                     topP = platform.topP,
-                    tools = if (webSearchEnabled) webSearchToolDefinition() else null
+                    tools = if (toolsEnabled) toolDefinitions(includeWebSearch = webSearchEnabled, includeTitleTool = isFirstTurn) else null
                 )
             },
             stream = { request ->
@@ -297,7 +321,7 @@ class ChatRepositoryImpl @Inject constructor(
             emit(ApiState.Error(e.message ?: "Unknown error"))
         }
 
-        if (webSearchEnabled) {
+        if (toolsEnabled) {
             toolCallOrchestrator.orchestrateWithToolDetection(
                 initialFlow = baseFlow,
                 onToolCallDetected = {},
@@ -379,33 +403,67 @@ class ChatRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun webSearchToolDefinition(): List<OpenAITool> = listOf(
-        OpenAITool(
-            function = OpenAIToolFunction(
-                name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.NAME,
-                description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.DESCRIPTION,
-                parameters = OpenAIToolParameters(
-                    properties = mapOf(
-                        dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY to OpenAIToolProperty(
-                            type = "string",
-                            description = "The search query"
+    private fun toolDefinitions(includeWebSearch: Boolean = true, includeTitleTool: Boolean = false): List<OpenAITool> {
+        val tools = mutableListOf<OpenAITool>()
+
+        if (includeWebSearch) {
+            tools.add(
+                OpenAITool(
+                    function = OpenAIToolFunction(
+                        name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.NAME,
+                        description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.DESCRIPTION,
+                        parameters = OpenAIToolParameters(
+                            properties = mapOf(
+                                dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY to OpenAIToolProperty(
+                                    type = "string",
+                                    description = "The search query"
+                                )
+                            ),
+                            required = listOf(dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY)
                         )
-                    ),
-                    required = listOf(dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool.PARAM_QUERY)
+                    )
                 )
             )
-        ),
-        OpenAITool(
-            function = OpenAIToolFunction(
-                name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.NAME,
-                description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.DESCRIPTION,
-                parameters = OpenAIToolParameters(
-                    properties = emptyMap(),
-                    required = emptyList()
+            tools.add(
+                OpenAITool(
+                    function = OpenAIToolFunction(
+                        name = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.NAME,
+                        description = dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool.DESCRIPTION,
+                        parameters = OpenAIToolParameters(
+                            properties = emptyMap(),
+                            required = emptyList()
+                        )
+                    )
                 )
             )
-        )
-    )
+        }
+
+        if (includeTitleTool) {
+            tools.add(
+                OpenAITool(
+                    function = OpenAIToolFunction(
+                        name = SetTitleTool.NAME,
+                        description = SetTitleTool.DESCRIPTION,
+                        parameters = OpenAIToolParameters(
+                            properties = mapOf(
+                                SetTitleTool.PARAM_TITLE to OpenAIToolProperty(
+                                    type = "string",
+                                    description = "Short descriptive title for the conversation"
+                                ),
+                                SetTitleTool.PARAM_ICON to OpenAIToolProperty(
+                                    type = "string",
+                                    description = "Icon name from: ${ConversationIcons.available.joinToString(", ")}"
+                                )
+                            ),
+                            required = listOf(SetTitleTool.PARAM_TITLE, SetTitleTool.PARAM_ICON)
+                        )
+                    )
+                )
+            )
+        }
+
+        return tools
+    }
 
     private suspend fun buildContextTurns(
         userMessages: List<MessageV2>,
@@ -964,7 +1022,10 @@ class ChatRepositoryImpl @Inject constructor(
     override suspend fun saveChat(chatRoom: ChatRoomV2, messages: List<MessageV2>, chatPlatformModels: Map<String, String>): ChatRoomV2 {
         if (chatRoom.id == 0) {
             // New Chat
-            val chatId = chatRoomV2Dao.addChatRoom(chatRoom)
+            val pending = pendingTitle
+            pendingTitle = null
+            val chatRoomToSave = if (pending != null) chatRoom.copy(icon = pending.icon) else chatRoom
+            val chatId = chatRoomV2Dao.addChatRoom(chatRoomToSave)
             val updatedMessages = messages.map { it.copy(chatId = chatId.toInt()) }
             messageV2Dao.addMessages(*updatedMessages.toTypedArray())
             saveChatPlatformModels(
@@ -972,10 +1033,11 @@ class ChatRepositoryImpl @Inject constructor(
                 models = chatPlatformModels.filterKeys { it in chatRoom.enabledPlatform }
             )
 
-            val savedChatRoom = chatRoom.copy(id = chatId.toInt())
-            updateChatTitle(savedChatRoom, updatedMessages[0].content)
+            val savedChatRoom = chatRoomToSave.copy(id = chatId.toInt())
+            val newTitle = pending?.title ?: updatedMessages[0].content.replace('\n', ' ').take(50)
+            updateChatTitle(savedChatRoom, newTitle)
 
-            return savedChatRoom.copy(title = updatedMessages[0].content.replace('\n', ' ').take(50))
+            return savedChatRoom.copy(title = newTitle)
         }
 
         val savedMessages = fetchMessagesV2(chatRoom.id)

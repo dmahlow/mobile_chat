@@ -219,7 +219,7 @@ fun HomeScreen(
                             )
                         } else {
                             Icon(
-                                ImageVector.vectorResource(id = R.drawable.ic_rounded_chat),
+                                imageVector = mapConversationIcon(chatRoom.icon),
                                 contentDescription = stringResource(R.string.chat_icon)
                             )
                         }

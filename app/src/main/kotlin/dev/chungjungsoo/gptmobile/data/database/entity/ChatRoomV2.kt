@@ -27,6 +27,9 @@ data class ChatRoomV2(
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis() / 1000,
 
+    @ColumnInfo(name = "icon", defaultValue = "chat")
+    val icon: String = "chat",
+
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long = System.currentTimeMillis() / 1000
 ) : Parcelable
