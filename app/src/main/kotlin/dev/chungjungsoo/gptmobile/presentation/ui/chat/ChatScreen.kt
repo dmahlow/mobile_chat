@@ -59,6 +59,9 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -118,6 +121,14 @@ fun ChatScreen(
     val maximumOpponentChatBubbleWidth = screenWidthDp - systemChatMargin
     val listState = rememberLazyListState()
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val simultaneousScrollConnection = remember(scrollBehavior) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                scrollBehavior.state.contentOffset += available.y
+                return Offset.Zero
+            }
+        }
+    }
 
     val chatRoom by chatViewModel.chatRoom.collectAsStateWithLifecycle()
     val groupedMessages by chatViewModel.groupedMessages.collectAsStateWithLifecycle()
@@ -141,14 +152,19 @@ fun ChatScreen(
 
     val scope = rememberCoroutineScope()
 
-    // With reverseLayout, index 0 is the bottom (newest). isAtBottom = firstVisibleItemIndex == 0
     val isAtBottom by remember {
-        derivedStateOf { listState.firstVisibleItemIndex == 0 }
+        derivedStateOf {
+            listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset < 100
+        }
     }
 
-    // Scroll to bottom (index 0 in reverseLayout)
-    LaunchedEffect(groupedMessages.userMessages.size) {
-        listState.scrollToItem(0)
+    // Only scroll to bottom when user sends a new message
+    val messageCount = groupedMessages.userMessages.size
+    LaunchedEffect(messageCount) {
+        if (messageCount > 0) {
+            listState.scrollToItem(0)
+        }
     }
 
     LaunchedEffect(isLoaded) {
@@ -207,7 +223,7 @@ fun ChatScreen(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        .nestedScroll(simultaneousScrollConnection),
                     state = listState,
                     reverseLayout = true
                 ) {
