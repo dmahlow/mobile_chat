@@ -213,6 +213,12 @@ object ChatDatabaseV2Migrations {
         }
     }
 
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE chats_v2 ADD COLUMN icon TEXT NOT NULL DEFAULT 'chat'")
+        }
+    }
+
     internal fun legacyFilesToAttachmentsJson(filesValue: String): String {
         val attachments = filesValue
             .split(",")

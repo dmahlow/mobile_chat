@@ -4,9 +4,11 @@ import dev.chungjungsoo.gptmobile.data.dto.ApiState
 import dev.chungjungsoo.gptmobile.data.dto.brave.BraveSearchResponse
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.DateTimeTool
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.SearchSource
+import dev.chungjungsoo.gptmobile.data.dto.toolcalling.SetTitleTool
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.ToolCallRequest
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.ToolCallResult
 import dev.chungjungsoo.gptmobile.data.dto.toolcalling.WebSearchTool
+import dev.chungjungsoo.gptmobile.data.model.ConversationIcons
 import dev.chungjungsoo.gptmobile.data.network.BraveSearchAPI
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -22,6 +24,7 @@ class ToolCallOrchestrator(
     private val settingRepository: SettingRepository
 ) {
     private val maxIterations = 3
+    var onTitleSet: (suspend (title: String, icon: String) -> Unit)? = null
 
     fun orchestrate(
         initialFlow: Flow<ApiState>,
@@ -106,7 +109,7 @@ class ToolCallOrchestrator(
                 return@flow
             }
 
-            toolCalls.forEach { tc ->
+            toolCalls.filter { it.name != SetTitleTool.NAME }.forEach { tc ->
                 emit(ApiState.ToolCallChunk(index = 0, id = tc.id, name = tc.name, argumentsChunk = null))
             }
 
@@ -150,6 +153,15 @@ class ToolCallOrchestrator(
                 DateTimeTool.NAME -> {
                     results.add(ToolCallResult(toolCallId = toolCall.id, name = toolCall.name, result = getCurrentDateTime()))
                 }
+                SetTitleTool.NAME -> {
+                    val title = extractJsonString(toolCall.arguments, SetTitleTool.PARAM_TITLE)
+                    val icon = extractJsonString(toolCall.arguments, SetTitleTool.PARAM_ICON)
+                    if (title != null) {
+                        val validIcon = if (icon != null && icon in ConversationIcons.available) icon else ConversationIcons.default
+                        onTitleSet?.invoke(title, validIcon)
+                    }
+                    results.add(ToolCallResult(toolCallId = toolCall.id, name = toolCall.name, result = "Title set successfully"))
+                }
             }
         }
 
@@ -166,11 +178,13 @@ class ToolCallOrchestrator(
         return """{"date": "$date", "time": "$time", "day_of_week": "$dayOfWeek", "timezone": "$timezone", "utc_offset": "$utcOffset"}"""
     }
 
-    private fun extractSearchQuery(arguments: String): String? = try {
+    private fun extractSearchQuery(arguments: String): String? = extractJsonString(arguments, WebSearchTool.PARAM_QUERY)
+
+    private fun extractJsonString(arguments: String, key: String): String? = try {
         val json = Json.parseToJsonElement(arguments)
         val obj = json as? kotlinx.serialization.json.JsonObject
-        val queryElement = obj?.get(WebSearchTool.PARAM_QUERY)
-        (queryElement as? kotlinx.serialization.json.JsonPrimitive)?.content
+        val element = obj?.get(key)
+        (element as? kotlinx.serialization.json.JsonPrimitive)?.content
     } catch (_: Exception) {
         null
     }
