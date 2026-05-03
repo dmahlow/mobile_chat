@@ -35,7 +35,7 @@ object DateTimeTool {
 
 object SetTitleTool {
     const val NAME = "set_conversation_title"
-    const val DESCRIPTION = "Set the conversation title and icon. Call this once at the start of a conversation to give it a descriptive short title (under 40 chars) and choose an appropriate icon from the available set."
+    const val DESCRIPTION = "REQUIRED: You MUST call this tool on your first response in every conversation. Set a short descriptive title (under 40 chars, no quotes) and choose the most fitting icon. Do this BEFORE writing your main response text."
     const val PARAM_TITLE = "title"
     const val PARAM_ICON = "icon"
 }
